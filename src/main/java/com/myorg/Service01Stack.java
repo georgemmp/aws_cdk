@@ -1,12 +1,11 @@
 package com.myorg;
 
+import software.amazon.awscdk.Duration;
 import software.amazon.awscdk.RemovalPolicy;
 import software.amazon.awscdk.Stack;
 import software.amazon.awscdk.StackProps;
-import software.amazon.awscdk.services.ecs.AwsLogDriverProps;
-import software.amazon.awscdk.services.ecs.Cluster;
-import software.amazon.awscdk.services.ecs.ContainerImage;
-import software.amazon.awscdk.services.ecs.LogDriver;
+import software.amazon.awscdk.services.applicationautoscaling.EnableScalingProps;
+import software.amazon.awscdk.services.ecs.*;
 import software.amazon.awscdk.services.ecs.patterns.ApplicationLoadBalancedFargateService;
 import software.amazon.awscdk.services.ecs.patterns.ApplicationLoadBalancedTaskImageOptions;
 import software.amazon.awscdk.services.elasticloadbalancingv2.HealthCheck;
@@ -33,13 +32,16 @@ public class Service01Stack extends Stack {
                 .publicLoadBalancer(true)
                 .build();
 
-        service01.getTargetGroup().configureHealthCheck(
-                new HealthCheck.Builder()
-                        .path("/actuator/health")
-                        .port("8080")
-                        .healthyHttpCodes("200")
+        this.createHealthCheck(service01);
+
+        ScalableTaskCount scalableTaskCount = this.createScalableTaskCount(service01);
+        scalableTaskCount.scaleOnCpuUtilization("Service01AutoScaling",
+                CpuUtilizationScalingProps.builder()
+                        .targetUtilizationPercent(50)
+                        .scaleInCooldown(Duration.seconds(60))
+                        .scaleInCooldown(Duration.seconds(60))
                         .build()
-        );
+                );
     }
 
     private ApplicationLoadBalancedTaskImageOptions createApplicationLoadBalanceTaskImageOptions() {
@@ -64,5 +66,24 @@ public class Service01Stack extends Stack {
                 .logGroupName("Service01")
                 .removalPolicy(RemovalPolicy.DESTROY)
                 .build();
+    }
+
+    private void createHealthCheck(ApplicationLoadBalancedFargateService service) {
+        service.getTargetGroup().configureHealthCheck(
+                new HealthCheck.Builder()
+                        .path("/actuator/health")
+                        .port("8080")
+                        .healthyHttpCodes("200")
+                        .build()
+        );
+    }
+
+    private ScalableTaskCount createScalableTaskCount(ApplicationLoadBalancedFargateService service) {
+        return service.getService().autoScaleTaskCount(
+                EnableScalingProps.builder()
+                        .minCapacity(2)
+                        .maxCapacity(4)
+                        .build()
+        );
     }
 }
