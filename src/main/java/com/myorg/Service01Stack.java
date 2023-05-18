@@ -57,6 +57,7 @@ public class Service01Stack extends Stack {
         return LogDriver.awsLogs(
                 AwsLogDriverProps.builder()
                         .logGroup(this.createLogGroup())
+                        .streamPrefix("Service01")
                         .build()
         );
     }
